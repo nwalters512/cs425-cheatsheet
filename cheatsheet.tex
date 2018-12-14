@@ -28,7 +28,7 @@
 \setlist{partopsep=-\parskip,parsep=0pt}
 
 \begin{document}
-\fontsize{7}{7}
+\fontsize{6}{6}
 \selectfont
 \begin{multicols*}{3}
 \section{Distributed systems}
@@ -89,7 +89,7 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{SWIM detection time}: probability of being pinged in $T\prime = 1-(1-\frac{1}{N})^{N-1}=1-e^{-1}$, so $E[T] = T\prime\cdot\frac{e}{e-1}$, so complete: any alive member detects failures \\
 \textbf{Time-bounded completeness}: round-robin pinging, randomly permute list after each traversal. Failure is detected in worst case $2N-1$ protocol periods \\
 \textbf{Member dissemination}: piggyback on failure detector messages for infection-style dissemination; maintain buffer of recently joined and evicted processes and prefer recent updates \\
-\textbf{Suspicion}: per-process incarnation number, only $p_i$ can increment $p_i$'s number; higher #s override lover #s; for given #, suspect $>$ alive, failed $>$ anything else \\
+\textbf{Suspicion}: per-process incarnation number, only $p_i$ can increment $p_i$'s number; higher \#s override lover \#s; for given \#, suspect $>$ alive, failed $>$ anything else \\
 \textbf{In industry}: used by Serf/Consul, Uber's ringpop
 
 \section{Peer-to-peer systems}
@@ -99,15 +99,63 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{Gnutella search}: flooded out, ttl-restricted, only forward once; \textit{QueryHit}s routed on reverse path \\
 \textbf{Avoiding excessive traffic}: peer maintains list of recently received messages; query forwarded fo all neighbors except query source; queries forwarded only once; \textit{QueryHit} routed back only to peer from which \textit{Query} received; duplicates are dropped; \textit{QueryHit} with unseen ID is dropped \\
 \textbf{QueryHit response}: requester chooses "best" responder, initiates HTTP request directly to peer, peer replies with file packets. HTTP is used (standard, debugged, \texttt{Range} header supported \\
-\textbf{Firewalls}: if unable to reach peer, routes a \textit{Push} to responder and has the responder send a HTTP-like \texttt{GIV} message, requester then sends \texttt{GET} and continues as before \\
+\textbf{Firewalls}: if unable to reach peer, routes a \textit{Push} to responder and has the responder send a HTTP-like \texttt{GIV} message, requester then sends \texttt{GET} as before \\
 \textbf{Pingpong}: \textit{Ping} flooded out, \textit{Pong} routed along reverse path; used to update set of neighboring peers periodically \\
 \textbf{Problems}: ping/pong constituted 50\% of traffic (solution? multiplex, cache, reduce frequency), repeated searches (cache \textit{Query} + \textit{QueryHit} messages), freeloaders (70\% of users in 2000), flooding results in excessive traffic \\
 \textbf{FastTrack}: like Gnutella, but with supernodes! Peers become supernodes by earning reputation; supernodes store $<$filename, peer pointer$>$ like Napster; peer searches by querying supernode \\
 \textbf{BitTorrent}: files split into blocks; person wanting file first gets tracker from a website, then asks tracker for peers, then gets blocks from peers \\
 \textbf{Optimizations}: dowload Local Rarest Block first (early download of blocks that are least replicated among neighbors), tit for tat bandwidth (provide blocks to neighbors with best download rates), choking (limits \# neighbors to which concurrent uploads allowed) \\
-\textbf{Distributed hash table}: allows lookup, insertion, and deletion of objects (files) with keys \\
+\textbf{Distributed hash table}: allows lookup, insertion, and deletion of objects (files) with keys
+
+\section{Time and ordering}
+\textbf{Clock skew}: relative difference in values \\
+\textbf{Clock drift}: relative difference in rates/frequencies \\
+\textbf{Synchronization}: max drift rate (MDR); max drift between two clocks with same MDR is $2\text{MDR}$; for acceptable skew $M$, clocks must sync ever $M/(s*\text{MDR})$ units \\
+\textbf{Cristian's}: $P\rightarrow S$ = min1, $S\rightarrow P$ = min2; $T = [t + \text{min2}, t + \text{RTT} - \text{min1}]$, err $< (\text{RTT}-\text{min2}-\text{min1})/2$ \\
+\textbf{NTP}: $\text{offset} = (\text{tr1} - \text{tr2} + \text{ts2} - \text{ts1})/2$ \\
+\textbf{Lamport}: happens-before = $\rightarrow$; rules: a) $a \rightarrow b$ in same process is $\text{time}(a) < \text{time}(b)$, b) $\text{send}(m) \rightarrow \text{receive}(m)$, c) transitivity; creates partial order \\
+\textbf{Impl}: process keeps local counter; increments on send or instruction; messages carry timestamps; on receive, counter becomes max(local, msg timestamp) + 1 \\
+\textbf{Concurrent}: no causal path from one event to the other; Lamport cannot distinguish concurrent events \\
+\textbf{Vector timestamps}: process $i$ maintains vector $V_i[1...N]$; when $i$ has instruction or send, increment element $i$; messages carry entire vector; when receive at $i$, $V_i[i] += 1$, $V_i[j] = \text{max}(V_\text{message}[j], V_i[j]) \forall j \neq i$ \\
+\textbf{Causally-related}: iff $VT_1 < VT_2$, i.e. $VT_1 \leq VT_2$, and $\exists j$ such that $1 \leq j \leq N$ and $VT_1[j] < VT_2[j]$; events are concurrent iff NOT $VT_1 \leq VT_2$ AND NOT $VT_2 \leq VT_1$ \\
+
+\section{Snapshots}
+\textbf{Def}: individual state of each process and communication channel; assume FIFO and no failure or message duplication \\
+\textbf{Chandy-Lamport}: initiator $P_i$ records state; send Marker message on all outgoing channels and start recording incoming messages on each incoming channel; when msg received, a) first Marker, so record state, mark incoming channel empty, send marker message to other processes, record on incoming channels except self and source of marker; b) already seen, so mark state of incoming channel as all arrived messages since recording started; ends when all processes have received marker on all $N-1$ incoming channels \\
+\includegraphics[width=\columnwidth]{chandylamport.png}
+\textbf{Cut}: time frontier at each process/channel; events before cut are ``in the cut"; cut is consistent if it obeys causality: for all pairs $e,f$, if $e$ in cut and $f \rightarrow e$, then $f$ also in cut; Chandy-Lamport snapshot creates consistent cut \\
+
+\section{Paxos}
+
+\section{Multicast}
+\textbf{Forms}: multicast (to group), broadcast (all processes), unicast (one-to-one) \\
+\textbf{FIFO ordering}: multicasts from each sender received in order they are sent, at all receivers; each receiver maintains vector of sequence numbers that is the latest sequence number that was received from a given process \\
+\includegraphics[width=\columnwidth]{fifo.png}
+\textbf{Causal ordering}: send events that are causally-related must be received in same causality-ordering order at all receivers; send entire vector with each message
+\includegraphics[width=\columnwidth]{causal.png}
+\textbf{Total ordering}: aka ``atomic broadcast", ensures all receivers receive all multicasts in the same order (if $P$ delivers message $m$ before $m\prime$, then any $P\prime$ that delivers $m\prime$ would already have delivered $m$); sequencer approach: $P_i$ sends $M$ to group and sequencer, sequencer maintains $S$ and increments/broadcasts it when receives a message; $P_j$ buffers until sequencer message received and local sequence counter + 1 = received sequence number \\
+\textbf{Hybrid}: FIFO/Causal orthogonal to Total, hybrid approaches that satisfy both can exist \\
+\textbf{Virtual/View synchrony}: combines membership+multicast protocol \\
+\textbf{Views}: each process maintains a memebership list (view); VS guarantees all view changes are delivered in same order at all correct processes; VS ensures a) set of multicasts delivered in a given view is tehe same set at all correct processes that were in the view (what happens in view stays in view), b) sender of multicast message also belings to view, and c) if $P_i$ does not deliver $M$ in $V$, while other processes in $V$ delivered $M$ in $V$, then $P_i$ will be forcibly removed from next view at other processes \\
+\textbf{Problems}: susceptible to partitioning
+
+\section{Leader election}
+\textbf{Goal}: elect exactly one agreed-upon leader \\
+\textbf{Guarantees}: safety (all non-faulty processes choose same process or null), liveness (all election runs terminate and elected process is not null) \\
+\textbf{Ring election}: process discovering failed coordinator sends ``election" msg with own ID; for received msg: a) ID is greater, so forward, b) ID is smaller and $p$ not forwarded an earlier election message, overwrite with own ID and forward; c) if ID is same as process, $p$ is now leader, sends ``elected" msg; safe and live if no failures; best case $2N$ messages, worst case $3N-1$ messages
+\textbf{Bully}: all processes know all IDs; process discovering failed coordinator does a) if knows its own ID is highest, sends ``coordinator" message to all processes with lower IDs, or b) sends ``election" message to processes with higher IDs. If no answer within timeout, becomes leader and sends ``coordinator" to all lower IDs. If answer, wait for ``coordinator" message; if none after timeout, start new election. Process receiving ``election" replies ``OK" and starts own leader election protocol (unless already done so); safe if failures stop; worst case $O(N^2)$, best case $(N-2)$ ``coordinator" messages \\
+\textbf{Consensus to solve election}: each process proposes a value, group reaches consensus on $P_i$'s value, $P_i$ becomes leader \\
+\textbf{Chubby}: potential leader asks for votes from other servers, each server votes for at most one leader, server with majority (quorum) becomes leader, informs others
 
 \section{Mutual exclusion}
+\textbf{Uses}: DFS; safe/consistent access to objects; server coordination \\
+\textbf{Properties}: safety (essential, only one process in CS at any time), liveness (essential, every request granted eventually), ordering (desirable, requests granted in the order received) \\
+\textbf{Semaphore}: allows max accessors, wait/signal \\
+\textbf{System model}: reliable channels, FIFO, no failure \\
+\textbf{Perf}: bandwidth (total messages sent per enter/exit operation), client delay (incurred at each enter exit operation, assuming no process in or waiting), synchronization delay (interval between one CS exit and next CS enter, assuming only one waiting) \\
+\textbf{Central}: master keeps queue of waiting requests and a token; sends token to process on its turn; process sends token back on CS exit; safe, live, and FIFO!; bandwidth (2 enter, 1 exit), client (2 msg latencies for req + grant), sync (2 msg latencies); but master is bottleneck/SPoF \\
+\textbf{Ring-based}: 1 token, wait til get token, pass token on exit, pass on if not waiting; safe and live; bandwidth (up to N in system on enter, 1 on exit), client (best case, have token; worst case, just sent token to neighbor), sync (1 to $N-1$)
+\textbf{TODO: Ricart-Agrawala, Maekawa, Chubby}
 
 \section{RPCs \& concurrency control}
 \textbf{Local Procedure Call}: exactly-once semantics \\
