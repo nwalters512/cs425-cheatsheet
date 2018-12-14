@@ -1,34 +1,23 @@
 \documentclass{article}
 \usepackage{anyfontsize}
 \usepackage{lmodern}
-%\usepackage{extsizes}
 \usepackage[utf8]{inputenc}
 \usepackage{multicol}
-%\usepackage{parskip}
 \usepackage{amsmath}
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{graphicx}
 \usepackage{ulem}
 \usepackage{xcolor}
-\usepackage[printwatermark]{xwatermark}
-\usepackage[letterpaper, portrait, margin=0.1in]{geometry}
+\usepackage[letterpaper, portrait, margin=0.2in]{geometry}
 \usepackage{titlesec}
 
-% \newwatermark[allpages,color=gray!35,angle=45,scale=3,xpos=0,ypos=0]{nwalter2}
-
-
-\title{CS 425 Final Cheat Sheet}
-\author{nwalters512 }
-\date{December 2018}
-
-\titleformat*{\section}{\small\bfseries}
-
+\titleformat*{\section}{\footnotesize\bfseries}
 \titlespacing*{\section}{0pt}{0ex}{0ex}
-\setlist{partopsep=-\parskip,parsep=0pt}
+\setlength{\columnsep}{3px}
 
 \begin{document}
-\fontsize{6}{6}
+\fontsize{5}{6}
 \selectfont
 \begin{multicols*}{3}
 \section{Distributed systems}
@@ -62,7 +51,7 @@
 \section{Gossip}
 \textbf{Multicast}: disseminates message to group of nodes; nodes can crash and packets can be dropped; protocol should be reliable (atomic, 100\% delivery) and fast \\
 \textbf{Centralized}: slow ($O(n)$ time to broadcast) and not fault-tolerant (what if sender failed halfway through sending?) \\
-\textbf{Tree-based}: build spanning tree; failed nodes may not pass on message until tree is repaired; tree maintenance is hard; ACK/NAK floods could occur; (REWATCH BEFORE SEPT 11 SRM/RMTP) \\
+\textbf{Tree-based}: build spanning tree; failed nodes may not pass on message until tree is repaired; tree maintenance is hard; ACK/NAK floods could occur \\
 \textbf{Gossip}: periodically picks $b$ random nodes and sends messages to them; needs deduplication; all nodes start sending messages as well once ``infected" \\
 \textbf{Push gossip}: start gossiping after receive message; if multiple messages, gossip random subset, or recently-received, or higher priority; lightweight in large groups, spreads quickly, fault-tolerant \\
 \textbf{Pull gossip}: poll randomly selected processes for new messages \\
@@ -78,7 +67,7 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 
 \section{Failure detection}
 \textbf{Goals}: scalable (equal load per member), fast (time until some process detects failure), complete (each failure detected), accurate (no mistaken detection); impossible to have both accuracy and completeness (or could solve consensus!) \\
-\textbf{Preferred}: Guaranteed completeness, partial accuracy guarantee
+\textbf{Preferred}: Guaranteed completeness, partial accuracy guarantee \\
 \textbf{Centralized heartbeating}: all ping one node, if no ping from $p_i$ received within timeout, declare $p_i$ failed. Bad: $O(N)$ load on central node \\
 \textbf{Ring}: ping neighbors. Unpredictable on multiple simultaneous failures \\
 \textbf{All-to-all}: equal load per member, but a single heartbeat loss means a false detection \\
@@ -105,7 +94,45 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{FastTrack}: like Gnutella, but with supernodes! Peers become supernodes by earning reputation; supernodes store $<$filename, peer pointer$>$ like Napster; peer searches by querying supernode \\
 \textbf{BitTorrent}: files split into blocks; person wanting file first gets tracker from a website, then asks tracker for peers, then gets blocks from peers \\
 \textbf{Optimizations}: dowload Local Rarest Block first (early download of blocks that are least replicated among neighbors), tit for tat bandwidth (provide blocks to neighbors with best download rates), choking (limits \# neighbors to which concurrent uploads allowed) \\
-\textbf{Distributed hash table}: allows lookup, insertion, and deletion of objects (files) with keys
+\textbf{Distributed hash table}: allows lookup, insertion, and deletion of objects (files) with keys \\
+\textbf{Perf}: [mem,lookup,\#msg for lookup] Napster ($O(1)$ for all, $O(N)$ mem@server), Gnutella ($O(N)$ all), Chord ($O(\log N)$ all) \\
+\textbf{Chord}: uses consistent hashing on node addresses; SHA1(address,port) $\leftarrow$ 160 bit string, truncate to $m$ bits; called peer ID, between 0 and $2^m - 1$, maps to $2^m$ logical points on circle \\
+\textbf{Finger table}: $i$th entry at peer with ID $n$ is first peer with id $>= (n+2^i)\mod 2^m$ \\
+\textbf{Files}: same consistent hash, file with key $K$ stored at first peer with ID $>= K \mod 2^m$; for query, send to largest finger table entry $<= K$, if none exist, send to successor; repeat, takes $O(\log N)$ time total \\
+\textbf{New peers}: $O(\log N)$ finger entries affected, $O(\log N * \log N)$ messages per join (similar for leave); stabilization protocol that checks and updates pointers and keys to ensure non-loopiness; strong stability takes $O(N^2)$ stabilization rounds \\
+\textbf{Pastry}: virtual ring with node IDs, like Chord; routing tables based on prefix matching (think: hypercube), so routing is $O(\log N)$ and network hops are short \\
+\textbf{Routing}: nodes maintain list of neighbors matching prefixes of its own address with the $n$th bit differing; to route to a peer, forward to neighbor with largest matching prefix \\
+\textbf{Kelips}: 1-hop DHT; $k$ affinity groups, $k \approx \sqrt{N}$; nodes hashed to groups $\mod k$, each group has one contact node in each other group
+
+\section{Key/value stores \& NoSQL}
+\textbf{Abstraction}: basically a dictionary (insert, lookup, delete by key) \\
+\textbf{Relational databases}: don't match today's workloads (large \& unstructured data, lots of random reads/writes, foreign keys rarely needed, joins infrequent) \\
+\textbf{Modern workloads}: need speed; avoid single point of failure; scale out, not up \\
+\textbf{NoSQL}: ``Not Only SQL"; API needs get(key) and put(key, value); sometimes extended SQL-like operations (see ``CQL" for Cassandra) \\
+\textbf{Tables}: ``column families" in Cassandra, ``tables" in HBase, ``collections" in MongoDB; often unstructured (no schema); don't necessarily support joins or foreign keys, but can have indices like RDBMs \\
+\textbf{Column-oriented storage}: NoSQL typically store column or group of columns together, columns are indexed for fast lookup; useful because range searches can be fast (no need to fetch whole DB) \\
+\textbf{Cassandra}: Ring-based DHT, but no finger tables or routing; offers eventual consistency (replicas converge if writes stop) \\
+\textbf{Placement strategies}: simple (Random partitioner, like Chord; ByteOrdered, assigns ranges of keys to servers); network topology (multi-DC deployments: first replica per Partitioner, then go clockwise until different rack) \\
+\textbf{Snitches}: Map IPs to racks and DCs; simple (rack-unaware), rack inferring (x.DC octet.Rack octet.Node octet), property file (config), EC2 (region = DC, availability zone = rack) \\
+\textbf{Writes}: send write to one coordinator in cluster, coordinator talks to replicas; once $X$ replicas respond, ack to client; if any replica is down, buffer until back online, then write (buffer up to a few hours); one ring per DC \\
+\textbf{Writes at replicas}: log to disk; change memtable (in-memory representation of multiple K/V pairs, write-back); flush to disk as SSTable (immutable, sorted by key, uses bloom filter) when full \\
+\textbf{Bloom filter}: set all hashed bits, to query, check if all hashed bits are set \\
+\textbf{Compaction}: merges SSTables by key \\
+\textbf{Deletes}: add tombstone; compaction will delete later \\
+\textbf{Reads}: coord contacts $X$ replicas, when $X$ respond, return latest value \\
+\textbf{CAP}: any two of consistency, availability, partition-tolerance \\
+\textbf{BASE}: Basically-Available Soft-state Eventual consistency \\
+\textbf{Consistency levels}: ANY, ALL, ONE, QUORUM \\
+\textbf{Quorum}: majority ($> 50\%$), any two quorums intersect; $W+R>N$, $W>N/2$ \\
+\textbf{W,R}: W=R=1 for few R/W; W=N,R=1 for R-heavy; W=R=N/2+1 for W-heavy; W=1,R=N for W-heavy with one client/key \\
+\textbf{Linearizability}: each operation available simultaneously to all clients \\
+\textbf{Sequential consistency}: result of any execution is same as if operations of all processors were executed in some sequential order, and operations of each processor appear in sequence in the order specified by program (find reasonable order after the fact) \\
+\textbf{Per-key sequential}: per key, all operations have a global order \\
+\textbf{CRDTs}: Cumulative Replicated Data Types; commutated writes give same results \\
+\textbf{Red-blue consistency}: blue ops executed in any order across DCs, red ops executed in same order at each DC \\
+\textbf{Levels}: Eventual, casual, red-blue/per-key, probabilistic/CRDTs, strong/sequential \\
+\textbf{HBase}: Get/Put, Scan(range/filter), MultiPut; table split into regions (replicated); ColumnFamily (subset of columns with similar patterns); one Store per ColumnFamily+region; Memstore per store (flushed to disk when full); StoreFiles for each region; HFile (list SSTable); strong consistency via write-ahead log; replay stale logs after failure recovery or bootup (select via timestamps); coordination via Zookeeper \\
+\textbf{MongoDB}: BSON (Binary JavaScript Object Notation) documents; group of related docs with common index called a collection; data split in chunks, sharded into collections of chunks, shards assigned to replica set, which is multiple servers (usually 3), replica set members mirror each other (one is primary, other secondaries); routers send queries to correct replica set; oplog to sync data; read concern (primary, primary-preferred, secondary, nearest, majority) - secondary might fetch stale data; write concern (0 no ack, 1 primary ack, majority) - weaker concern implies faster write; journal in write-ahead log for durability; chunks split when grow too large, and migrated among shards if uneven distribution; either strongly or eventually consistent, depending on R/W concerns
 
 \section{Time and ordering}
 \textbf{Clock skew}: relative difference in values \\
@@ -117,15 +144,20 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{Impl}: process keeps local counter; increments on send or instruction; messages carry timestamps; on receive, counter becomes max(local, msg timestamp) + 1 \\
 \textbf{Concurrent}: no causal path from one event to the other; Lamport cannot distinguish concurrent events \\
 \textbf{Vector timestamps}: process $i$ maintains vector $V_i[1...N]$; when $i$ has instruction or send, increment element $i$; messages carry entire vector; when receive at $i$, $V_i[i] += 1$, $V_i[j] = \text{max}(V_\text{message}[j], V_i[j]) \forall j \neq i$ \\
-\textbf{Causally-related}: iff $VT_1 < VT_2$, i.e. $VT_1 \leq VT_2$, and $\exists j$ such that $1 \leq j \leq N$ and $VT_1[j] < VT_2[j]$; events are concurrent iff NOT $VT_1 \leq VT_2$ AND NOT $VT_2 \leq VT_1$ \\
+\textbf{Causally-related}: iff $VT_1 < VT_2$, i.e. $VT_1 \leq VT_2$, and $\exists j$ such that $1 \leq j \leq N$ and $VT_1[j] < VT_2[j]$; events are concurrent iff NOT $VT_1 \leq VT_2$ AND NOT $VT_2 \leq VT_1$
 
 \section{Snapshots}
 \textbf{Def}: individual state of each process and communication channel; assume FIFO and no failure or message duplication \\
 \textbf{Chandy-Lamport}: initiator $P_i$ records state; send Marker message on all outgoing channels and start recording incoming messages on each incoming channel; when msg received, a) first Marker, so record state, mark incoming channel empty, send marker message to other processes, record on incoming channels except self and source of marker; b) already seen, so mark state of incoming channel as all arrived messages since recording started; ends when all processes have received marker on all $N-1$ incoming channels \\
 \includegraphics[width=\columnwidth]{chandylamport.png}
-\textbf{Cut}: time frontier at each process/channel; events before cut are ``in the cut"; cut is consistent if it obeys causality: for all pairs $e,f$, if $e$ in cut and $f \rightarrow e$, then $f$ also in cut; Chandy-Lamport snapshot creates consistent cut \\
+\textbf{Cut}: time frontier at each process/channel; events before cut are ``in the cut"; cut is consistent if it obeys causality: for all pairs $e,f$, if $e$ in cut and $f \rightarrow e$, then $f$ also in cut; Chandy-Lamport snapshot creates consistent cut
 
 \section{Paxos}
+\textbf{Goals}: safety (no disagreement), liveness (protocol ends) \\
+\textbf{Synchronous}: with at most $f$ crashing, run $f+1$ rounds; $\text{Values}^r_i$: proposed values known to $p_i$ at beginning or round $r$; $\text{Values}^0_i = {}$; $\text{Values}^1_i = {v_i}$; for rounds 1 to $f+1$, multicast($\text{Values}^r_i - \text{Values}^{r-1}_i$, $\text{Values}^{r+1}_i \leftarrow \text{Values}^r_i$, for each $V_j$ received, $\text{Values}^{r+1}_i = \text{Values}^{r+1}_i \cup V_j$; $d_i = \text{min}(\text{Values}^{f+2}_i)$ \\
+\textbf{Paxos}: provides safety, eventual liveness; asynchronous rounds; 3 phases: election, bill, law \\
+\textbf{Impl}: election: potential leader chooses unique higher ballot ID, send to all processes, processes respond once to highest ballot ID, if process has previously decided $v\prime$, include $v\prime$ in response, become leader when a quorum responds with OK; bill: leader sends proposed $v$ to all, use $v=v\prime$ if received during election, recipient responds OK; law: if leader hears majority OKs, tell everyone decision. decision reached when majority of processes are about to/have responded with OK \\
+\textbf{Handling problems}: P restarts (use log to retrieve a past decision and past- seen ballot ids), leader fails (start new round), anyone can start a round any time, may never end
 
 \section{Multicast}
 \textbf{Forms}: multicast (to group), broadcast (all processes), unicast (one-to-one) \\
@@ -136,13 +168,13 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{Total ordering}: aka ``atomic broadcast", ensures all receivers receive all multicasts in the same order (if $P$ delivers message $m$ before $m\prime$, then any $P\prime$ that delivers $m\prime$ would already have delivered $m$); sequencer approach: $P_i$ sends $M$ to group and sequencer, sequencer maintains $S$ and increments/broadcasts it when receives a message; $P_j$ buffers until sequencer message received and local sequence counter + 1 = received sequence number \\
 \textbf{Hybrid}: FIFO/Causal orthogonal to Total, hybrid approaches that satisfy both can exist \\
 \textbf{Virtual/View synchrony}: combines membership+multicast protocol \\
-\textbf{Views}: each process maintains a memebership list (view); VS guarantees all view changes are delivered in same order at all correct processes; VS ensures a) set of multicasts delivered in a given view is tehe same set at all correct processes that were in the view (what happens in view stays in view), b) sender of multicast message also belings to view, and c) if $P_i$ does not deliver $M$ in $V$, while other processes in $V$ delivered $M$ in $V$, then $P_i$ will be forcibly removed from next view at other processes \\
+\textbf{Views}: each process maintains a membership list (view); VS guarantees all view changes are delivered in same order at all correct processes; VS ensures a) set of multicasts delivered in a given view is the same set at all correct processes that were in the view (what happens in view stays in view), b) sender of multicast message also belongs to view, and c) if $P_i$ does not deliver $M$ in $V$, while other processes in $V$ delivered $M$ in $V$, then $P_i$ will be forcibly removed from next view at other processes \\
 \textbf{Problems}: susceptible to partitioning
 
 \section{Leader election}
 \textbf{Goal}: elect exactly one agreed-upon leader \\
 \textbf{Guarantees}: safety (all non-faulty processes choose same process or null), liveness (all election runs terminate and elected process is not null) \\
-\textbf{Ring election}: process discovering failed coordinator sends ``election" msg with own ID; for received msg: a) ID is greater, so forward, b) ID is smaller and $p$ not forwarded an earlier election message, overwrite with own ID and forward; c) if ID is same as process, $p$ is now leader, sends ``elected" msg; safe and live if no failures; best case $2N$ messages, worst case $3N-1$ messages
+\textbf{Ring election}: process discovering failed coordinator sends ``election" msg with own ID; for received msg: a) ID is greater, so forward, b) ID is smaller and $p$ not forwarded an earlier election message, overwrite with own ID and forward; c) if ID is same as process, $p$ is now leader, sends ``elected" msg; safe and live if no failures; best case $2N$ messages, worst case $3N-1$ messages \\
 \textbf{Bully}: all processes know all IDs; process discovering failed coordinator does a) if knows its own ID is highest, sends ``coordinator" message to all processes with lower IDs, or b) sends ``election" message to processes with higher IDs. If no answer within timeout, becomes leader and sends ``coordinator" to all lower IDs. If answer, wait for ``coordinator" message; if none after timeout, start new election. Process receiving ``election" replies ``OK" and starts own leader election protocol (unless already done so); safe if failures stop; worst case $O(N^2)$, best case $(N-2)$ ``coordinator" messages \\
 \textbf{Consensus to solve election}: each process proposes a value, group reaches consensus on $P_i$'s value, $P_i$ becomes leader \\
 \textbf{Chubby}: potential leader asks for votes from other servers, each server votes for at most one leader, server with majority (quorum) becomes leader, informs others
@@ -154,15 +186,17 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{System model}: reliable channels, FIFO, no failure \\
 \textbf{Perf}: bandwidth (total messages sent per enter/exit operation), client delay (incurred at each enter exit operation, assuming no process in or waiting), synchronization delay (interval between one CS exit and next CS enter, assuming only one waiting) \\
 \textbf{Central}: master keeps queue of waiting requests and a token; sends token to process on its turn; process sends token back on CS exit; safe, live, and FIFO!; bandwidth (2 enter, 1 exit), client (2 msg latencies for req + grant), sync (2 msg latencies); but master is bottleneck/SPoF \\
-\textbf{Ring-based}: 1 token, wait til get token, pass token on exit, pass on if not waiting; safe and live; bandwidth (up to N in system on enter, 1 on exit), client (best case, have token; worst case, just sent token to neighbor), sync (1 to $N-1$)
-\textbf{TODO: Ricart-Agrawala, Maekawa, Chubby}
+\textbf{Ring-based}: 1 token, wait til get token, pass token on exit, pass on if not waiting; safe and live; bandwidth (up to N in system on enter, 1 on exit), client (best case, have token; worst case, just sent token to neighbor), sync (1 to $N-1$) \\
+\textbf{Ricart-Agrawala}: multicast request with Lamport timestamp, wait for all to respond OK; requests granted in order of causality; $2(N-1)$ messages per enter, client delay = 1 RTT, sync delay = 1 message transmission time \\
+\textbf{Maekawa}: process associated with voting set; intersection of any two voting sets must be non-empty (quorums!), $K$ sets, $M$ sets/process, $K=M=\sqrt{N}$ is best; $2\sqrt{N}$ per enter, $\sqrt{N}$ per exit, client delay = 1 RTT, sync delay = 2 message transmission times \\
+\textbf{Chubby}: Paxos-like consensus; advisory locks only (no mutex guaranteed unless every clicnt checks locks before access)
 
 \section{RPCs \& concurrency control}
 \textbf{Local Procedure Call}: exactly-once semantics \\
 \textbf{RPC Semantics}: at most once (Java RMI), at least once (Sun RPC), maybe/best-effort (COBRA) \\
 \textbf{Idempotent}: applied multiple times without any side effects; can be used with at-least-once semantics \\
 \textbf{Marshalling}: convert req/res into common, platform independent representation \\
-\textbf{Transactions}: either comples and commits all operations, of aborts with no effect \\
+\textbf{Transactions}: either completes and commits all operations, of aborts with no effect \\
 \textbf{ACID}: atomic (all or nothing), consistency (if starts in consistent state, transaction ends in consistent state), isolation (transactions performed without interference from other transactions), durability (all effects saved in permanent storage after transaction completed successfully) \\
 \textbf{Serial equivalence}: interleaving of transactions is serially equivalent iff some ordering of transactions which gives the same end result as the original interleaving \\
 \textbf{Conflicting operations}: if combined effect depends on order of execution (R then W, W then R, W then W) \\
@@ -171,22 +205,22 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{Pessimistic CC}: prevent transactions from accessing same object (locking; use R/W locks for better perf) \\
 \textbf{Optimistic CC}: assume the best, allow transactions to write, but check later; higher concurrency and transactions per second \\
 \textbf{Two-phase locking}: transaction cannot acquire or promote any locks after it has started releasing locks (growing/shrinking phase; strict: only release locks at commit point); proof of serial equivalence by contradiction (growing/shrinking phases would overlap) \\
-\textbf{Deadlocks}: mutual exclusion, preemption, circular wait all necessary
+\textbf{Deadlocks}: mutual exclusion, preemption, circular wait all necessary \\
 \textbf{Basic optimistic CC}: check serial equivalence at commit time, roll back if abort (problem: cascading aborts) \\
 \textbf{Timestamp ordering}: assign each transaction and ID; ID determines position in serialization order; ensure for $T$ a) $T$'s write to $O$ allowed only if transactions that have R/W $O$ had lower IDs than $T$, and b) $T$'s read to $O$ allowed only if $O$ was last written by transaction with lower ID than $T$; abort if violation \\
 \textbf{Multi-version CC}: maintain per-transaction tentative version and committed version; each tentative version has timestamp; on R/W, find ``correct" tentative version to R/W from (tries to make transactions only R/W from ``immediately previous" transactions \\
-\textbf{Eventual consistency}: form of optimistic concurrency control in K/V stores
+\textbf{Eventual consistency}: form of optimistic concurrency control in K/V stores \\
 \textbf{Cassandra/DynamoDB}: last write wins (overwrite only if new write's timestamp $>$ current timestamp) \\
-\textbf{Riak}: vector clocks! Implements causal ordering, detect if a) new write is strictly newer than current value, or b) if new write conflicts with existing value. For b) \textit{sibling value} is created to be resolved by user/application; size/time based pruning to prevent clocks from getting too many/too old entries
+\textbf{Riak}: vector clocks! Implements causal ordering, detect if a) new write is strictly newer than current value, or b) if new write conflicts with existing value. For b) \textit{sibling value} is created to be resolved by user/application; size/time based pruning to prevent clocks from getting too many entries
 
 \section{Replication control}
 \textbf{Motivation}: fault-tolerance, load balancing, availability (with replication, probability of available replica is $(1 - f^k)$), transparency (client doesn't know multiple copies exist), consistency (all clients see consistent copy of data) \\
 \textbf{Passive replication}: use primary replica \\
 \textbf{Active replication}: treat all replicas identically; multicast inside replica group with any type of multicast ordering; handle failures with virtual synchrony \\
 \textbf{One-copy serializability}: true if equivalent to a serial execution of transactions over a single logical copy of the database \\
-\textbf{Transactions}: might touch object on multiple servers, need atomic commit (consensus!)
+\textbf{Transactions}: might touch object on multiple servers, need atomic commit (consensus!) \\
 \textbf{One-phase commit}: coordinator server initiates atomic commit \\
-\textbf{Two-phase commit}: coordinator sends ``prepare"; servers save updates to disk, respond with Y/N; if coordinator receives all Y within timeout, tell servers to commit updates from disk to store; otherwise, abort all
+\textbf{Two-phase commit}: coordinator sends ``prepare"; servers save updates to disk, respond with Y/N; if coordinator receives all Y within timeout, tell servers to commit updates from disk to store; otherwise, abort all \\
 \textbf{Paxos}: server proposes message for next sequence number, group reaches consensus (or not); allows for ``no" votes
 
 \section{Stream/graph processing}
@@ -209,13 +243,13 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{Hadoop Capacity Scheduler}: multiple queues (possibly hierarchical), each queue contains multiple jobs; each queue guaranteed some portion of cluster capacity; elasticity (can occupy more resources if they're free; no preemption \\
 \textbf{Hadoop Fair Scheduler}: goal is for all jobs to get equal share of resources; cluster divided into pool, resources divided equally between pools; configurable scheduler within pool; preemption allowed (kill most recently started tasks to minimize wasted work; OK because tasks are idempotent) \\
 \textbf{Estimating task lengths}: hard; can estimate (proportional to size of input; weighted average by input size across other tasks in job) \\
-\textbf{Dominant-Resource Fair Scheduling}: tries to handle multi-resource requirements (mem/CPU/etc.); jobs have resource vectors $<N \text{ CPUs}, M \text{ GB RAM}>$; for a given job, the \% of its dominant resource type that it gets cluster-wide is same for all jobs (Job 1 RAM dominant, Job 2 CPU dominant, Job 1 \% RAM = Job 2 \% CPU) \textbf{(REVIEW THIS LOL)}
+\textbf{Dominant-Resource Fair Scheduling}: tries to handle multi-resource requirements (mem/CPU/etc.); jobs have resource vectors $<N \text{ CPUs}, M \text{ GB RAM}>$; for a given job, the \% of its dominant resource type that it gets cluster-wide is same for all jobs (Job 1 RAM dominant, Job 2 CPU dominant, Job 1 \% RAM = Job 2 \% CPU)
 
 \section{Structure of networks}
-\textbf{Properties}: Clustering coefficient ($P(AB | (AC \&\& CB)$), path length (shortest path); Extended right graph (high CC, long paths), Random (low CC, short paths), Small world (high CC, short paths)
+\textbf{Properties}: Clustering coefficient ($P(AB | (AC \&\& CB)$), path length (shortest path); Extended right graph (high CC, long paths), Random (low CC, short paths), Small world (high CC, short paths) \\
 \textbf{Small-world resilience}: most nodes have small degree, few nodes have high degree; killing lots of random nodes won't disconnect, but a few high-degree nodes will
 
-\section{Distrib file systems}
+\section{Distributed file systems}
 \textbf{Unix FS}: file descriptors (handle for process to access file); must open file before reading/writing; descriptor maintains R/W pointer to offset within file; R/W automatically advances pointer \\
 \textbf{Distributed FS}: client does RPC to perform file ops; desirable properties: transparency (behaves like local FS), concurrent clients, replication (fault tolerance) \\
 \textbf{One-copy update semantics}: when file is replicated, contents visible to clients are no different from when only 1 replica \\
@@ -223,7 +257,7 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{NFS}: client integrated with kernel, performs RPC to server; server allows mounting files and directories (essentially, pointers); allows processes to access file descriptors (transparency!); server caching (store recently access blocks in memory (supports locality of access)); writes: delayed (flush every 30s, fast but not consistent), write-through (write to disk immediately, consistent but maybe slow); client caching ($Tc =$ time of cache entry last validated, $Tm =$ time when block last modified at server, block valid at $T$ if $(T-T_c < t)$ or $(Tm_{\text{client}} = Tm_{\text{server}})$, delayed write to server on write) \\
 \textbf{AFS}: whole file serving/caching (based on assumptions that most files accessed by single server, most files small, files read more often than written, reads typically sequential), Venus client, Vice server, optimistic reads/writes, opened files get callback promise (Vice notifies Venus if another client modifies/closes)
 
-\section{Distrib shared memory}
+\section{Distributed shared memory}
 \textbf{Benefit}: same code as if running on same multiprocessor OS \\
 \textbf{Impl}: cache maintained at each process, stores recently accessed pages; pages mapped in local memory; on page fault, kernel invokes DSM \\
 \textbf{Protocol}: Owner is process with latest version; page in R or W state; when page in R state, owner has R copy, others may have R copies, no W copies; when page in W state, only owner has copy \\
@@ -236,7 +270,7 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{Node}: sensors, microprocessor, comms link, power \\
 \textbf{Transmission}: RF (store and forward, bidirectional), optical (directional antennas, costly broadcast, line of sight needed, passive routing (``wormhole"), unidirectional links) \\
 \textbf{TinyOS}: event-driven (hardware events), modular structure (components), static allocation \\
-\textbf{Power saving}: MICA (active, idle, sleep)
+\textbf{Power saving}: MICA (active, idle, sleep) \\
 \textbf{Optimization}: transmit is expensive, so compute instead of transmit; build trees among nodes, calculate summaries in trees, transmit only summaries
 
 \section{Security}
@@ -247,9 +281,8 @@ So, within $c\log{n}$ rounds [low latency], all but $\frac{1}{n^{cb-2}}$ have re
 \textbf{Public-private key systems}: $K_{A\text{priv}}$ known only to Alice, $K_{A\text{pub}}$ known to everyone (RSA, PGP) \\
 \textbf{Details}: Shared keys hard to revoke; public/private keys involve costly en/decryption (solution? use to generate shared key) \\
 \includegraphics[width=\columnwidth]{indierect.png}
-\textbf{Signatures}: authentic, unforgeable, verifiable, non-repudiable: $[M, K_{A\text{priv}}(\text{Hash}(M))]$ (hash for efficiency)
-\textbf{Authorization}: Access Control Matrix (large \& sparse),
-Access Control Lists (per object, allowed principals/access), Capability Lists (per principal, list of files \& access types)
+\textbf{Signatures}: authentic, unforgeable, verifiable, non-repudiable: $[M, K_{A\text{priv}}(\text{Hash}(M))]$ (hash for efficiency) \\
+\textbf{Authorization}: Access Control Matrix (large \& sparse), Access Control Lists (per object, allowed principals/access), Capability Lists (per principal, list of files \& access types)
 
-\end{multicols}
+\end{multicols*}
 \end{document}
